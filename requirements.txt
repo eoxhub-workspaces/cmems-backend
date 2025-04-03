@@ -28,6 +28,7 @@ xarray==2024.10.0
 zarr==2.18.3
 fsspec==2024.10.0
 odc-stac==0.3.10
+dask==2025.2.0  # https://github.com/dask/dask/issues/11843
 pystac_client==0.8.5
 rioxarray==0.18.1
 boto3==1.35.66

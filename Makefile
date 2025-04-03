@@ -24,4 +24,4 @@ up:
 	docker compose up
 
 build:
-	cd .. && docker compose build
+	docker compose build
