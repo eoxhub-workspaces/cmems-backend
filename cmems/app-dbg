@@ -1,0 +1,177 @@
+from typing import cast
+
+import numpy as np
+import odc.stac
+import pystac_client
+import rioxarray
+import shapely
+import structlog
+import xarray as xr
+from asgi_correlation_id import CorrelationIdMiddleware
+from fastapi import FastAPI, Request
+from starlette_exporter import PrometheusMiddleware, handle_metrics
+
+# from cmems.setup_logging import RequestIdLoggingMiddleware, setup_logging
+
+# setup_logging()
+
+app = FastAPI()
+
+# app.add_middleware(RequestIdLoggingMiddleware)
+app.add_middleware(PrometheusMiddleware)
+app.add_middleware(CorrelationIdMiddleware)
+app.add_route("/metrics", handle_metrics)
+
+
+LOGGER = structlog.get_logger()
+
+COMMON_TIME_DIMENSION_NAMES = ["time", "t", "date", "datetime", "time_index"]
+
+COMMON_FIRST_SPACE_DIMENSION_NAMES = ["x", "lat", "latitude"]
+COMMON_SECOND_SPACE_DIMENSION_NAMES = ["y", "lon", "longitude"]
+
+print(rioxarray)
+
+
+@app.get("/")
+async def landing_page(request: Request):
+    return {}
+
+
+@app.get("/healthz")
+def healthz():
+    return {"message": "All is OK!"}
+
+
+@app.get("/stats/")
+def stats(geometry: str):
+    # TODO errror handling as fastapi thingy
+    geometry_parsed = shapely.from_geojson(geometry)
+    # bbox = (
+    #    -2.0,
+    #    41.0,
+    #    -1.85,
+    #    41.1,
+    # )
+    datetime_query = ("2021-10-01T00:00:00Z", "2021-10-20T00:00:00Z")
+    LOGGER.debug("Handling stats request")
+    # *
+    # * load data with odc.load_stac or similar to openeo notebook:
+    #     https://github.com/Open-EO/openeo-processes-dask/blob/main/openeo_processes_dask/process_implementations/cubes/load.py#L135
+    #     from s3://eox-gitlab-testdata/vs/daily_average_cog
+    #      https://stac.eurac.edu/collections/Irrigation_Ebro_basin
+    # * add basic parameters as needed, mostly bbox and time range?
+    # * output basic statistics
+
+    catalog = pystac_client.Client.open("https://stac.eurac.edu/")
+    query = catalog.search(
+        max_items=8,
+        # bbox=bbox,
+        intersects=geometry_parsed,
+        datetime=datetime_query,
+        collections=["Irrigation_Ebro_basin"],
+    )
+
+    ds = odc.stac.load(
+        query.items(),
+        bands=["Irrigation"],
+        geopolygon=geometry_parsed,
+        crs="EPSG:4326",
+        # bbox=bbox,
+    )
+    ds.rio.set_spatial_dims(x_dim="lat", y_dim="lon", inplace=True)
+    ds.rio.write_crs("EPSG:4326", inplace=True)
+
+    clipped = ds.rio.clip([geometry_parsed], all_touched=True)
+
+    breakpoint()
+    print(clipped)
+    irrig = ds.Irrigation
+    irrig.rio.set_spatial_dims(x_dim="lat", y_dim="lon", inplace=True)
+    irrig.rio.write_crs("EPSG:4326", inplace=True)
+    # rio.write_crs("EPSG:4326")
+    #  break  /usr/local/lib/python3.12/dist-packages/rioxarray/raster_array.py:220
+    from rasterio.features import geometry_mask
+
+    x = geometry_mask(
+        {
+            "type": "Polygon",
+            "coordinates": [
+                (58.5, 68.5),
+                (63.5, 68.5),
+                (63.5, 73.5),
+                (58.5, 73.5),
+                (58.5, 68.5),
+            ],
+        },
+        out_shape=(3, 3),
+        transform=ds.rio.transform(recalc=True),
+        all_touched=True,
+        invert=True,
+    )
+    print(x)
+    area = {
+        "type": "Polygon",
+        "coordinates": [
+            (
+                # (10.0, 10.0),
+                # (102.0, 10.0),
+                # (102.0, 172.0),
+                # (10.0, 10.0),
+                #  (59.5, 69.5),
+                #  (62.5, 69.5),
+                #  (62.5, 72.5),
+                #  (59.5, 72.5),
+                #  (59.5, 69.5),
+                (58.5, 68.5),
+                (63.5, 68.5),
+                (63.5, 73.5),
+                (58.5, 73.5),
+                (58.5, 68.5),
+            ),
+        ],
+    }
+    bbox = irrig.rio.bounds()
+    clipped = irrig.rio.clip_box(bbox[0] + 1, bbox[1], bbox[2], bbox[3] - 1)
+    clipped = irrig.rio.clip([area], all_touched=True)
+
+    return statistics(ds)
+
+
+def statistics(ds: xr.Dataset) -> dict:
+    time_index = _matching_dim(ds, COMMON_TIME_DIMENSION_NAMES)
+    non_time_indexes = [dim for dim in ds.dims if dim != time_index]
+
+    def _serialize_da_with_date(da: xr.DataArray) -> dict:
+        return dict(
+            zip(
+                np.datetime_as_string(da[time_index].values),
+                da.values.tolist(),
+                strict=True,
+            )
+        )
+
+    def _stats_for_dataarray(da: xr.DataArray) -> dict:
+        if time_index:
+            return {
+                "min": _serialize_da_with_date(da.min(dim=non_time_indexes)),
+                "max": _serialize_da_with_date(da.max(dim=non_time_indexes)),
+                "mean": _serialize_da_with_date(da.mean(dim=non_time_indexes)),
+                "stddev": _serialize_da_with_date(da.std(dim=non_time_indexes)),
+            }
+        else:
+            return {
+                "min": da.min().values.tolist(),
+                "max": da.max().values.tolist(),
+                "mean": da.mean().values.tolist(),
+                "stddev": da.std().values.tolist(),
+            }
+
+    return {key: _stats_for_dataarray(da) for key, da in ds.items()}
+
+
+def _matching_dim(ds: xr.Dataset, names: list[str]) -> str | None:
+    return next(
+        (cast(str, dim) for dim in ds.dims if dim in names),
+        None,
+    )

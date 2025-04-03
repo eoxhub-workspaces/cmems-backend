@@ -1,0 +1,19 @@
+services:
+  cmems:
+    build:
+      context: .
+    ports:
+      - "6001:6000"
+    volumes:
+      - ./:/srv/service
+      - /home/mallinger/tmp/daily_average:/data
+    command: gunicorn --bind=0.0.0.0:6000 --worker-class uvicorn.workers.UvicornWorker --workers=1 --threads=1 --log-level=DEBUG --reload cmems.app:app
+    environment:
+      - AWS_S3_ENDPOINT=s3.eox.at
+      - AWS_REGION=default
+      # for local integration test runs, use gitlab-testdata CEPH S3 credentials for AK + SK
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - COPERNICUSMARINE_CACHE_DIRECTORY=/tmp
+    env_file:
+      - .env
