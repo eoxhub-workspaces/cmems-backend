@@ -1,4 +1,4 @@
-gdal==3.9.2
+dal==3.9.2
 pydantic==2.9.2
 pydantic-settings==2.5.2
 pydantic-extra-types==2.9.0
@@ -14,7 +14,9 @@ structlog==24.4.0
 asgi-correlation-id==4.3.3
 content-negotiation==1.1.2
 
-numpy<2
+numpy>=1.24,<2                # Restrict for stability with xarray/zarr
+numcodecs>=0.11.0,<1.0        # Fix ImportError with zarr/blosc (critical)
+blosc2>=2.0.0,<3.0.0          # Needed for some compression support (zarr)
 
 # dev tooling
 pytest==8.3.3
@@ -23,12 +25,11 @@ ruff==0.6.9
 mypy==1.11.2
 respx==0.21.1
 
-
 xarray==2024.10.0
 zarr==2.18.3
 fsspec==2024.10.0
 odc-stac==0.3.10
-dask==2025.2.0  # https://github.com/dask/dask/issues/11843
+dask==2025.2.0  # Known compatibility fix: https://github.com/dask/dask/issues/11843
 pystac_client==0.8.5
 rioxarray==0.18.1
 boto3==1.35.66
