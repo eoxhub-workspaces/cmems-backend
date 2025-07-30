@@ -7,12 +7,29 @@ RUN mkdir $PROMETHEUS_MULTIPROC_DIR \
     && chmod g+w $PROMETHEUS_MULTIPROC_DIR
 
 WORKDIR /srv/service
-RUN apt update -y && \
-    apt install python3-pip -y
-ADD requirements.txt .
-RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
 
-ADD . .
+# Install system build dependencies BEFORE pip install
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        python3-dev \
+        libblosc-dev \
+        libz-dev && \
+    python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python3 -m pip install --no-cache-dir --no-binary=numcodecs -r requirements.txt --break-system-packages && \
+    apt-get purge -y build-essential python3-dev libblosc-dev libz-dev && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /root/.cache
+
+# Install pip manually (in case system pip is outdated)
+RUN apt-get install -y python3-pip
+
+# Install Python dependencies with forced recompile of numcodecs
+COPY requirements.txt .
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+ && python3 -m pip install --no-cache-dir --no-binary=numcodecs -r requirements.txt --break-system-packages
+
+COPY . .
 
 USER www-data
 
