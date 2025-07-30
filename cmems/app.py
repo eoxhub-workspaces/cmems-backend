@@ -140,7 +140,7 @@ def cmems(
             maximum_depth=maximum_depth,
             service="timeseries",
             disable_progress_bar=True,
-            force_download=True,  # skip confirmation
+            dryRun=False, # make sure download is executed
             output_directory=temp_dir,
         )
 
