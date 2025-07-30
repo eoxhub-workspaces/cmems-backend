@@ -19,7 +19,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 
 # Step 2: Copy only requirements and install packages
 COPY requirements.txt .
-RUN python3 -m pip install --no-cache-dir --no-binary=numcodecs -r requirements.txt --break-system-packages
+RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 # Step 3: Remove build tools to reduce final image size
 RUN apt-get purge -y \

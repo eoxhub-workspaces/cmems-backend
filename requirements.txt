@@ -15,7 +15,7 @@ asgi-correlation-id==4.3.3
 content-negotiation==1.1.2
 
 numpy>=1.24,<2                # Restrict for stability with xarray/zarr
-numcodecs>=0.11.0,<1.0        # Fix ImportError with zarr/blosc (critical)
+numcodecs==0.15.1              # Fix ImportError with zarr/blosc (critical)
 blosc2>=2.0.0,<3.0.0          # Needed for some compression support (zarr)
 
 # dev tooling
