@@ -126,28 +126,33 @@ def cmems(
 ) -> dict:
     logger.debug(f"Handling cmems request for {dataset_id} {variables}")
     logger.debug(f"Requested date range: {start_datetime} {end_datetime}")
-    with tempfile.TemporaryDirectory() as temp_dir:
-        result_path = copernicusmarine.subset(
-            dataset_id=dataset_id,
-            variables=variables,
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
-            minimum_longitude=minimum_longitude,
-            maximum_longitude=maximum_longitude,
-            minimum_latitude=minimum_latitude,
-            maximum_latitude=maximum_latitude,
-            minimum_depth=minimum_depth,
-            maximum_depth=maximum_depth,
-            service="timeseries",
-            disable_progress_bar=True,
-            dryRun=False, # make sure download is executed
-            output_directory=temp_dir,
-        )
-
-        logger.debug(f"downloaded to {result_path}")
-        ds = xr.open_dataset(result_path)
-        logger.debug(f"opened ds {ds}")
-        return statistics(ds, dict_per_time=True)
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = copernicusmarine.subset(
+                dataset_id=dataset_id,
+                variables=variables,
+                start_datetime=start_datetime,
+                end_datetime=end_datetime,
+                minimum_longitude=minimum_longitude,
+                maximum_longitude=maximum_longitude,
+                minimum_latitude=minimum_latitude,
+                maximum_latitude=maximum_latitude,
+                minimum_depth=minimum_depth,
+                maximum_depth=maximum_depth,
+                service="timeseries",
+                coordinates_selection_method="nearest",
+                disable_progress_bar=True,
+                output_directory=temp_dir,
+            )
+            result_path = result.file_path
+            logger.debug(f"downloaded to {result_path}")
+            ds = xr.open_dataset(result_path)
+            logger.debug(f"opened ds {ds}")
+            return statistics(ds, dict_per_time=True)
+    except Exception as e:
+        logger.error(f"Error during data subset or processing: {e}", exc_info=True)
+        # Return an error response, adjust to your app framework (e.g., Flask, FastAPI)
+        return {"error": str(e)}
 
 
 @app.get("/stats/")
