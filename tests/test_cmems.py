@@ -10,8 +10,11 @@ def mock_copernicusmarine_subset(dataset: xr.Dataset):
     with tempfile.TemporaryDirectory() as temp_dir:
         path = f"{temp_dir}/le_file.nc"
         dataset.to_netcdf(path)
+        # Create a mock result object
+        mock_result = mock.Mock()
+        mock_result.file_path = path
         with mock.patch(
-            "cmems.app.copernicusmarine.subset", return_value=str(path)
+            "cmems.app.copernicusmarine.subset", return_value=mock_result
         ) as mocker:
             yield mocker
 
